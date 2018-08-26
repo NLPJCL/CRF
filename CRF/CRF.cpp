@@ -281,6 +281,8 @@ void CRF::updata_g(const sentence & sen)
 			}
 		}
 	}
+	int z = 0;
+	int q = 0;
 }
 void CRF::max_score_sentence_tag(const sentence &sen, vector<string> &path_max)
 {
