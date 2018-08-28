@@ -144,12 +144,25 @@ vector<int> CRF::get_id(const vector<string> &f)
 	}
 	return fv;
 }
-int CRF::count_score(int offset, const vector<int> &fv)
+vector<double> CRF::count_score(const vector<string> &feature)
 {
-	double score = 0;
-	for (auto z0 = fv.begin(); z0 != fv.end(); z0++)
+	int offset = 0;
+	vector<vector<double>> scores(tag.size(), vector<double>(feature.size(), 0));
+	for (int j = 0; j < tag.size(); j++)
 	{
-		score = score + w[offset + *z0];
+		offset = j * model.size();
+		for (int i = 0; i < feature.size(); i++)
+		{
+			if (model.find(feature[i]) != model.end())
+			{
+				scores[j][i] += w[model[feature[i]] + offset];
+			}
+		}
+	}
+	vector<double> score(tag.size());
+	for (int j = 0; j<tag.size(); j++)
+	{
+		score[j] = accumulate(scores[j].begin(), scores[j].end(), 0);
 	}
 	return score;
 }
@@ -159,70 +172,83 @@ vector<vector<double>> CRF::forword(const sentence &sen)
 	//第一个词
 	vector<string> first_feature = create_feature(sen, 0);
 	first_feature.push_back("01:*&&");
-	vector<int> fv_id = get_id(first_feature);
-	for (int i = 0; i < vector_tag.size(); i++)
+	scores[0]=count_score(first_feature);
+	for (int i = 0; i < tag.size(); i++)
 	{
-		int offset = i*model.size();
-		scores[0][i] = exp(count_score(offset, fv_id));
+		scores[0][i] = exp(scores[0][i]);
 	}
 	//其余的词。
 	for (int z = 1; z < sen.word.size(); z++)
 	{
 		vector<string> curr_feature = create_feature(sen, z);
-		curr_feature.push_back("01:*" + sen.tag[z - 1]);
-		vector<int> fv_id = get_id(curr_feature);
-		for (int i = 0; i < vector_tag.size(); i++)
+		vector<double> curr_score = count_score(curr_feature);
+		vector<vector<double>> p(tag.size(), vector<double>(tag.size(), 0));
+		for (int i = 0; i < tag.size(); i++)
 		{
-			int offset = i * model.size();
-			double curr_score=exp(count_score(offset, fv_id));
-			double all_score = 1;
+
+			for (int j = 0; j < tag.size(); j++)
+			{
+				p[i][j] = exp(head_prob[i][j] + curr_score[i]);
+			}
+		}
+		vector<double> all_score(tag.size());
+		for (int i = 0; i < tag.size(); i++)
+		{
+			int all = 0;
 			for (int j = 0; j < vector_tag.size(); j++)
 			{
-				all_score+= scores[z-1][j]*curr_score;
+				all =all+scores[z - 1][j] * p[i][j];
 			}
-			scores[z][i] = all_score;
+			all_score[i] = all;
 		}
+		scores[z] = all_score;
+	}
+
+	//测试
+	for (int i = 0; i < sen.tag.size(); i++)
+	{
+		for (int j = 0; j < tag.size(); j++)
+		{
+			cout << scores[i][j]<<"\t";
+		}
+		cout << endl;
 	}
 	return scores;
+
 }
 vector<vector<double>> CRF::backword(const sentence &sen)
 {
 	//方便计算。
 	vector<vector<double>> scores(sen.tag.size(), vector<double>(tag.size(), 0));
-	//最后一个词
-	vector<string> first_feature = create_feature(sen, sen.tag.size()-1);
-	first_feature.push_back("01:*" + sen.tag[sen.tag.size() - 2]);
-	vector<int> fv_id = get_id(first_feature);
-	for (int i = 0; i < vector_tag.size(); i++)
+	for (int i = 0; i < tag.size(); i++)
 	{
-		int offset = i * model.size();
-		scores[sen.tag.size()-1][i] = exp(count_score(offset, fv_id));
+		scores[0][i] = 1;//存个疑惑。
 	}
 	//其余的词。
 	for (int z = sen.word.size()-2; z >=0; z--)
 	{
-		vector<string> curr_feature = create_feature(sen, z);
-		if (z != 0)
+		vector<string> curr_feature = create_feature(sen, z+1);
+		vector<double> curr_score = count_score(curr_feature);
+		vector<vector<double>> p(tag.size(), vector<double>(tag.size(), 0));
+		for (int i = 0; i < tag.size(); i++)
 		{
-			curr_feature.push_back("01:*" + sen.tag[z - 1]);
-		}
-		else
-		{
-			curr_feature.push_back("01:*&&");
 
+			for (int j = 0; j < tag.size(); j++)
+			{
+				p[i][j] = exp(head_prob[i][j] + curr_score[i]);
+			}
 		}
-		vector<int> fv_id = get_id(curr_feature);
-		for (int i = 0; i < vector_tag.size(); i++)
+		vector<double> all_score(tag.size());
+		for (int i = 0; i < tag.size(); i++)
 		{
-			int offset = i * model.size();
-			double curr_score = exp(count_score(offset, fv_id));
-			double all_score = 0;
+			int all = 0;
 			for (int j = 0; j < vector_tag.size(); j++)
 			{
-				all_score+= scores[z +1][i] * curr_score;
+				all = all + scores[z +1][j] * p[i][j];
 			}
-			scores[z][i] = all_score;
+			all_score[z] = all;
 		}
+		scores[z] = all_score;
 	}
 	return scores;
 }
@@ -235,8 +261,19 @@ void CRF::update_w()
 }
 void CRF::updata_g(const sentence & sen)
 {
-	alpha = forword(sen);
-	beta = backword(sen);
+	vector<vector<double>> c(tag.size(), vector<double>(tag.size(), 0));
+	for (int i = 0; i < tag.size(); i++)
+	{
+
+		for (int j = 0; j < tag.size(); j++)
+		{
+			int max_tag_id = model["01:*" + vector_tag[j]];
+			c[i][j] = w[i*model.size() + max_tag_id];
+		}
+	}
+	head_prob = c;
+	vector<vector<double>> alpha = forword(sen);
+	vector<vector<double>> beta = backword(sen);
 	//计算分母。
 	double z = accumulate(alpha[sen.tag.size() - 1].begin(), alpha[sen.tag.size() - 1].end(), 0.0);
 	//对第一个词进行处理。
@@ -244,138 +281,127 @@ void CRF::updata_g(const sentence & sen)
 	first_feature.push_back("01:*&&");
 	vector<int> fv_id = get_id(feature);
 	int offset = tag[sen.tag[0]] * model.size();
-	for (int q = 0; q < fv_id.size(); q++)
+	for (int q = 0; q < fv_id.size(); ++q)
 	{
 		g[fv_id[q] + offset]++;
 	}
 	//减去第一个词错误的概率。
-	double score = count_score(offset, fv_id);
-	for (auto b = tag.begin(); b != tag.end(); b++)
+	vector<double> score = count_score(first_feature);
+	vector<double> p(tag.size());
+	for (int i = 0; i < tag.size(); i++)
 	{
-		int offset = tag[b->first] * model.size();
-		double p = (beta[0][tag[b->first]] * exp(score)) / z;
-		for (int q = 0; q < fv_id.size(); q++)
+		p[i]= (beta[0][i] * exp(score[i])) / z;
+	}
+	for (int j = 0; j > tag.size(); j++)
+	{
+		int offset = j * model.size();
+		for (int k = 0; k < fv_id.size(); k++)
 		{
-			g[fv_id[q] + offset] -= p;
+			g[fv_id[k] + offset] -= p[j];
 		}
 	}
 	//给其余的加权重。
-	for (int i = 1; i < sen.word.size(); i++)
+	for (int i = 1; i < sen.word.size(); ++i)
 	{
 		vector<string> curr_feature = create_feature(sen, i);
+		vector<double> curr_score = count_score(curr_feature);//计算没有01项的分数总和。
+		vector<vector<double>> head(tag.size(), vector<double>(tag.size(), 0));
 		curr_feature.push_back("01:*&&" + sen.tag[i - 1]);
 		vector<int> fv_id = get_id(feature);
 		int offset = tag[sen.tag[i]] * model.size();
-		for (int j = 0; j < fv_id.size(); j++)
+		for (int j = 0; j < fv_id.size(); ++j)
 		{
 			g[fv_id[j] + offset]++;
 		}
-		for (auto b = tag.begin(); b != tag.end(); b++)
+		for (int i = 0; i < tag.size(); i++)
 		{
-			int offset = b->second*model.size();
-			double score = count_score(offset, fv_id);
-			double p= (alpha[i - 1][tag[sen.tag[i - 1]]] * beta[i][tag[sen.tag[i]]] * exp(score) / z);
-			for (int j = 0; j < fv_id.size(); j++)
+
+			for (int j = 0; j < tag.size(); j++)
 			{
-				g[fv_id[j] + offset] -= p;
+				head[i][j] = exp(head_prob[i][j] + curr_score[i]);
+			}
+		}	
+		vector<vector<double>> p(tag.size(), vector<double>(tag.size(), 0));
+		for (int q = 0; q < tag.size(); q++)
+		{
+			for (int k = 0; k < tag.size(); k++)
+			{
+				p[q][k] = alpha[i - 1][k] * beta[i][q] * exp(head[q][k]) / z;
+			}
+		}
+		for (int w = 0; w < tag.size(); w++)
+		{
+			int offset = w * model.size();
+			for (int j = 0; j > tag.size(); j++)
+			{
+				for (int k = 0; k < fv_id.size(); k++)
+				{
+					g[fv_id[k] + offset] -= p[w][j];
+				}
 			}
 		}
 	}
-	int z = 0;
-	int q = 0;
+	head_prob.clear();
 }
-void CRF::max_score_sentence_tag(const sentence &sen, vector<string> &path_max)
+vector<string> CRF::max_score_sentence_tag(const sentence &sen)
 {
-	/*
-	vector<vector<int>> score_prob (sen.tag.size(), vector<int>(tag.size(), 0));
+	vector<vector<double>> score_prob(sen.tag.size(), vector<double>(tag.size(), 0));
 	vector<vector<int>> score_path(sen.tag.size(), vector<int>(tag.size(), 0));
+	vector<vector<double>> head_prob(tag.size(), vector<double>(tag.size(), 0));
 	for (int i = 0; i < tag.size(); i++)
 	{
-	score_path[0][i] = -1;
+
+		for (int j = 0; j < tag.size(); j++)
+		{
+			int max_tag_id = model["01:*" + vector_tag[j]];
+			head_prob[i][j] = w[i*model.size() + max_tag_id];
+		}
 	}
-	*/
-	MatrixXi score_prob = MatrixXi::Zero(tag.size(), sen.tag.size());
-	MatrixXi score_path = MatrixXi::Zero(tag.size(), sen.tag.size());
+	for (int i = 0; i < tag.size(); i++)
+	{
+		score_path[0][i] = -1;
+	}
 	//第一个词。
 	vector <string> feature = create_feature(sen, 0);
 	feature.push_back("01:*&&");
-	vector<int> fv_id = get_id(feature);
-	for (int i = 0; i <vector_tag.size(); i++)
-	{
-		int offset = i * model.size();
-		int score = count_score(offset, fv_id);
-		score_prob(i, 0) = score;
-	}
+	score_prob[0] = count_score(feature);
 	//其余的词。
 	for (int j = 1; j < sen.word.size(); j++)
 	{
-		for (int curr_tag = 0; curr_tag <vector_tag.size(); curr_tag++)
+
+		vector<double> currect_prob(tag.size(), 0);
+		vector <string> feature = create_feature(sen, j);
+		vector<double> score = count_score(feature);
+		for (int i = 0; i < tag.size(); i++)
 		{
-			//vector<int> currect_prob(tag.size(), 0);
-			VectorXd currect_prob = RowVectorXd::Zero(tag.size());
-			vector <string> feature = create_feature(sen, j);
-			vector<int> fv_id = get_id(feature);
-			int offset = curr_tag * model.size();
-			int score = count_score(offset, fv_id);
-			for (int pre_tag = 0; pre_tag <vector_tag.size(); pre_tag++)
+			for (int z = 0; z < tag.size(); z++)
 			{
-				int max_tag_id = model["01:*" + vector_tag[pre_tag]];
-				score += w[max_tag_id + offset];
-				currect_prob[pre_tag] = score + score_prob(pre_tag, j - 1);
+				currect_prob[z] = head_prob[i][z] + score_prob[j - 1][z];
 			}
-			//auto w = max_element(begin(currect_prob), end(currect_prob));
-			int max_index;
-			score_prob(curr_tag, j) = currect_prob.maxCoeff(&max_index);
-			score_path(curr_tag, j) = max_index;
+			auto w = max_element(begin(currect_prob), end(currect_prob));
+			score_prob[j][i] = *w + score[i];
+			score_path[j][i] = distance(begin(currect_prob), w);
 		}
 	}
-	/*
-	//其余的词。
-	for (int j = 1; j < sen.word.size(); j++)
-	{
-	for (int curr_tag = 0; curr_tag <vector_tag.size(); curr_tag++)
-	{
-	vector<int> currect_prob(tag.size(), 0);
-	vector <string> feature = create_feature(sen, 0, vector_tag[pre_tag]);
-	for (int pre_tag = 0; pre_tag <vector_tag.size(); pre_tag++)
-	{
-	vector <string> feature = create_feature(sen, 0, vector_tag[pre_tag]);
-	vector<int> fv_id = get_id(feature);
-	int offset = curr_tag*model.size();
-	int score = count_score(offset, fv_id);
-	currect_prob[curr_tag] = score + score_prob[j - 1][pre_tag];
-	}
-	auto w = max_element(begin(currect_prob), end(currect_prob));
-	score_prob[j][curr_tag] = *w;
-	score_path[j][curr_tag] = distance(begin(currect_prob), w);
-	}
-	}
-	*/
-	//vector<string> path_max;
-	/*
-	vector<int> a = score_prob[sen.word.size() - 1];
+	vector<string> path_max;
+	vector<double> a = score_prob[sen.word.size() - 1];
 	auto w = max_element(begin(a), end(a));
-	int max_point = distance(begin(a),w);
-	*/
-	VectorXi a = score_prob.col(score_prob.cols() - 1);
-	int max_point;
-	a.maxCoeff(&max_point);
+	int max_point = distance(begin(a), w);
 	for (int j = sen.word.size() - 1; j > 0; j--)
 	{
 		path_max.push_back(vector_tag[max_point]);
-		max_point = score_path(max_point, j);
+		max_point = score_path[j][max_point];
 	}
 	path_max.push_back(vector_tag[max_point]);
 	reverse(path_max.begin(), path_max.end());
-	//	return path_max;
+	return path_max;
 }
 double CRF::evaluate(dataset data)
 {
 	int correct = 0, all = 0;
 	for (auto sen = data.sentences.begin(); sen != data.sentences.end(); sen++)
 	{
-		vector<string> max_sentence_tag;
-		max_score_sentence_tag(*sen, max_sentence_tag);
+		vector<string> max_sentence_tag=max_score_sentence_tag(*sen);
 		for (int i = 0; i < max_sentence_tag.size(); i++)
 		{
 			if (max_sentence_tag[i] == sen->tag[i])

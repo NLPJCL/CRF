@@ -6,9 +6,7 @@
 #include <algorithm>  
 #include"dataset.h"
 #include "time.h"
-#include <Eigen/Dense>
 #include<numeric>
-using namespace Eigen;
 using namespace std;
 class CRF
 {
@@ -35,14 +33,13 @@ private:
 	//在线算法
 	void update_w();
 	void updata_g(const sentence &sen);
-	void max_score_sentence_tag(const sentence &sen, vector<string> &path_max);
+	vector<string> max_score_sentence_tag(const sentence &sen);
 	vector<int> get_id(const vector<string> &f);
-	int count_score(int offset, const vector<int> &fv);
+	vector<double> count_score(const vector<string> &feature);
 	//前后算法
-	vector<vector<double>> alpha, beta;
 	vector<vector<double>> forword(const sentence&);
 	vector<vector<double>> backword(const sentence&);
-
+	vector<vector<double>> head_prob;
 	//评价。
 	double evaluate(dataset);
 };
