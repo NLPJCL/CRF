@@ -214,7 +214,6 @@ vector<vector<double>> CRF::forword(const sentence &sen)
 		cout << endl;
 	}
 	return scores;
-
 }
 vector<vector<double>> CRF::backword(const sentence &sen)
 {
@@ -222,7 +221,7 @@ vector<vector<double>> CRF::backword(const sentence &sen)
 	vector<vector<double>> scores(sen.tag.size(), vector<double>(tag.size(), 0));
 	for (int i = 0; i < tag.size(); i++)
 	{
-		scores[0][i] = 1;//存个疑惑。
+		scores[sen.word.size()-1][i] = 1;//存个疑惑。
 	}
 	//其余的词。
 	for (int z = sen.word.size()-2; z >=0; z--)
@@ -246,7 +245,7 @@ vector<vector<double>> CRF::backword(const sentence &sen)
 			{
 				all = all + scores[z +1][j] * p[i][j];
 			}
-			all_score[z] = all;
+			all_score[i] = all;
 		}
 		scores[z] = all_score;
 	}
@@ -276,43 +275,45 @@ void CRF::updata_g(const sentence & sen)
 	vector<vector<double>> beta = backword(sen);
 	//计算分母。
 	double z = accumulate(alpha[sen.tag.size() - 1].begin(), alpha[sen.tag.size() - 1].end(), 0.0);
+	//对正确的序列进行处理，
+	for (int i = 0; i < sen.word.size(); i++)
+	{
+		vector<string> first_feature = create_feature(sen, i);
+		if (i == 0)
+		{
+			first_feature.push_back("01:*&&");
+		}
+		else
+		{
+			first_feature.push_back("01:*&&" + sen.tag[i - 1]);
+		}
+		vector<int> fv_id = get_id(first_feature);
+		int offset = tag[sen.tag[i]] * model.size();
+		for (int q = 0; q < fv_id.size(); ++q)
+		{
+			g[fv_id[q] + offset]++;
+		}
+	}
 	//对第一个词进行处理。
 	vector<string> first_feature = create_feature(sen, 0);
 	first_feature.push_back("01:*&&");
-	vector<int> fv_id = get_id(feature);
-	int offset = tag[sen.tag[0]] * model.size();
-	for (int q = 0; q < fv_id.size(); ++q)
-	{
-		g[fv_id[q] + offset]++;
-	}
-	//减去第一个词错误的概率。
-	vector<double> score = count_score(first_feature);
-	vector<double> p(tag.size());
+	vector<int> fv_id = get_id(first_feature);
+	vector<double> first_score = count_score(first_feature);
 	for (int i = 0; i < tag.size(); i++)
 	{
-		p[i]= (beta[0][i] * exp(score[i])) / z;
-	}
-	for (int j = 0; j > tag.size(); j++)
-	{
-		int offset = j * model.size();
-		for (int k = 0; k < fv_id.size(); k++)
+		int offset = i * model.size();
+		double p = (beta[0][i] * exp(first_score[i])) / z;
+		for (int j = 0; j < fv_id.size(); j++)
 		{
-			g[fv_id[k] + offset] -= p[j];
+			g[i + fv_id[j]] = g[i + fv_id[j]] - p;
 		}
 	}
-	//给其余的加权重。
+	//对所有有可能的系列进行处理。
 	for (int i = 1; i < sen.word.size(); ++i)
 	{
 		vector<string> curr_feature = create_feature(sen, i);
 		vector<double> curr_score = count_score(curr_feature);//计算没有01项的分数总和。
 		vector<vector<double>> head(tag.size(), vector<double>(tag.size(), 0));
-		curr_feature.push_back("01:*&&" + sen.tag[i - 1]);
-		vector<int> fv_id = get_id(feature);
-		int offset = tag[sen.tag[i]] * model.size();
-		for (int j = 0; j < fv_id.size(); ++j)
-		{
-			g[fv_id[j] + offset]++;
-		}
 		for (int i = 0; i < tag.size(); i++)
 		{
 
@@ -326,7 +327,7 @@ void CRF::updata_g(const sentence & sen)
 		{
 			for (int k = 0; k < tag.size(); k++)
 			{
-				p[q][k] = alpha[i - 1][k] * beta[i][q] * exp(head[q][k]) / z;
+				p[q][k] = alpha[i - 1][k] * beta[i][q] * head[q][k] / z;
 			}
 		}
 		for (int w = 0; w < tag.size(); w++)
@@ -425,12 +426,9 @@ void CRF::sgd_online_training()
 	{
 		start = clock();
 		cout << "iterator" << j << endl;
-		int i = 0;
 		for (auto sen = train.sentences.begin(); sen != train.sentences.end(); sen++)
 		{
 			b++;
-			i++;
-			cout << i << endl;
 			updata_g(*sen);
 			if (b == global_step)
 			{
@@ -438,14 +436,13 @@ void CRF::sgd_online_training()
 				b = 0;
 				g.clear();
 			}
-
 		}
 		stop = clock();
 		durationTime = ((double)(stop - start)) / CLK_TCK;
-		cout << "第" << j << "次迭代总耗时：" << durationTime << endl << endl;
 		//save_file(j);
 		double train_precision = evaluate(train);
 		double dev_precision = evaluate(dev);
+		cout << "第" << j << "次迭代总耗时：" << durationTime << endl << endl;
 		if (train_precision > max_train_precision)
 		{
 			max_train_precision = train_precision;
