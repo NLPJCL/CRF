@@ -194,7 +194,7 @@ vector<vector<double>> CRF::forword(const sentence &sen)
 		vector<double> all_score(tag.size());
 		for (int i = 0; i < tag.size(); i++)
 		{
-			int all = 0;
+			double all = 0;
 			for (int j = 0; j < vector_tag.size(); j++)
 			{
 				all =all+scores[z - 1][j] * p[i][j];
@@ -205,6 +205,7 @@ vector<vector<double>> CRF::forword(const sentence &sen)
 	}
 
 	//测试
+	/*
 	for (int i = 0; i < sen.tag.size(); i++)
 	{
 		for (int j = 0; j < tag.size(); j++)
@@ -213,6 +214,8 @@ vector<vector<double>> CRF::forword(const sentence &sen)
 		}
 		cout << endl;
 	}
+	*/
+
 	return scores;
 }
 vector<vector<double>> CRF::backword(const sentence &sen)
@@ -240,7 +243,7 @@ vector<vector<double>> CRF::backword(const sentence &sen)
 		vector<double> all_score(tag.size());
 		for (int i = 0; i < tag.size(); i++)
 		{
-			int all = 0;
+			double all = 0.0;
 			for (int j = 0; j < vector_tag.size(); j++)
 			{
 				all = all + scores[z +1][j] * p[i][j];
@@ -274,7 +277,8 @@ void CRF::updata_g(const sentence & sen)
 	vector<vector<double>> alpha = forword(sen);
 	vector<vector<double>> beta = backword(sen);
 	//计算分母。
-	double z = accumulate(alpha[sen.tag.size() - 1].begin(), alpha[sen.tag.size() - 1].end(), 0.0);
+	double z = accumulate(alpha[sen.tag.size()-1].begin(), alpha[sen.tag.size()-1].end(), 0.0);	
+	//cout << z << endl;
 	//对正确的序列进行处理，
 	for (int i = 0; i < sen.word.size(); i++)
 	{
@@ -343,6 +347,7 @@ void CRF::updata_g(const sentence & sen)
 		}
 	}
 	head_prob.clear();
+	
 }
 vector<string> CRF::max_score_sentence_tag(const sentence &sen)
 {
