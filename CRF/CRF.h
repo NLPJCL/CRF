@@ -44,5 +44,5 @@ private:
 	//ÆÀ¼Û¡£
 	double evaluate(dataset);
 };
-vector<double> logsumexp(vector<vector<double>> a);
-vector<vector<double>> translation(vector<vector<double>> a);
+vector<double> logsumexp(vector<vector<double>>& a);
+vector<vector<double>> translation(vector<vector<double>> &a);
