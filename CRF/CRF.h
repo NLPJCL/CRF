@@ -27,7 +27,7 @@ private:
 	map<int, double> g;
 	vector<double> w;//一维的特征权重。
 	vector<string> vector_tag;
-	vector<string> feature;//
+	//vector<string> feature;//
 						   //创建特征空间。
 	vector<string> create_feature(const sentence &sentence, int pos);
 	//在线算法
@@ -36,6 +36,7 @@ private:
 	vector<string> max_score_sentence_tag(const sentence &sen);
 	vector<int> get_id(const vector<string> &f);
 	vector<double> count_score(const vector<string> &feature);
+
 	//前后算法
 	vector<vector<double>> forword(const sentence&);
 	vector<vector<double>> backword(const sentence&);
@@ -43,4 +44,5 @@ private:
 	//评价。
 	double evaluate(dataset);
 };
-
+vector<double> logsumexp(vector<vector<double>> a);
+vector<vector<double>> translation(vector<vector<double>> a);
