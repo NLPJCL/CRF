@@ -9,7 +9,6 @@ void dataset::read_data(const string & file_name)
 	}
 	string line;
 	sentence sen;
-	int sentence_count = 0, word_count = 0;
 	while (getline(file, line))
 	{
 		if (line.size() == 0)
@@ -57,3 +56,4 @@ dataset::dataset()
 dataset::~dataset()
 {
 }
+
