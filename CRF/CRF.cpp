@@ -88,17 +88,20 @@ vector<string> CRF::create_feature(const sentence &sentence, int pos)
 	f.push_back("07:*" + word_char_first);
 	f.push_back("08:*" + word_char_last);
 	int pos_word_len = sentence.word_char[pos].size();
-	for (int k = 0; k < pos_word_len - 1; k++)
+	for (int k = 1; k < pos_word_len - 1; k++)
 	{
-		string cik = sentence.word_char[pos][k];
-		f.push_back("09:*" + cik);
-		f.push_back("10:*" + word_char_first + "*" + cik);
-		f.push_back("11:*" + word_char_last + "*" + cik);
-		string cikp1 = sentence.word_char[pos][k + 1];
-		if (cik == cikp1)
+		f.push_back("09:*" + sentence.word_char[pos][k]);
+		f.push_back("10:*" + word_char_first + "*" + sentence.word_char[pos][k]);
+		f.push_back("11:*" + word_char_last + "*" + sentence.word_char[pos][k]);
+		if (sentence.word_char[pos][k] == sentence.word_char[pos][k + 1])
 		{
-			f.push_back("13:*" + cik + "*" + "consecutive");
+			f.push_back("13:*" + sentence.word_char[pos][k] + "*" + "consecutive");
 		}
+
+	}
+	if (sentence.word_char[pos].size()>1&&sentence.word_char[pos][0] ==sentence.word_char[pos][1])
+	{
+		f.push_back("13:*" +sentence.word_char[pos][0] + "*" + "consecutive");
 	}
 	if (pos_word_len == 1)
 	{
@@ -138,7 +141,7 @@ void CRF::create_feature_space()
 {
 	train.read_data("train");
 	dev.read_data("dev");
-	test.read_data("test");
+	//test.read_data("test");
 	int word_count = 0, tag_count = 0;
 	vector<string> f;
 	for (auto sen = train.sentences.begin(); sen != train.sentences.end(); sen++)
@@ -407,19 +410,22 @@ void CRF::sgd_online_training()
 {
 	double max_train_precision = 0, max_dev_precision = 0, max_test_precision = 0;
 	int global_step = 1;
+	/*
 	ofstream result("bigresult.txt");
 	if (!result)
 	{
 		cout << "don't open feature file" << endl;
 	}
+
 	result << train.name << "共" << train.sentence_count << "个句子，共" << train.word_count << "个词" << endl;
 	result << dev.name << "共" << dev.sentence_count << "个句子，共" << dev.word_count << "个词" << endl;
 	result << test.name << "共" << test.sentence_count << "个句子，共" << test.word_count << "个词" << endl;
+	*/
 	DWORD t1, t2, t3, t4;
 	t1 = timeGetTime();
 	for (int j = 0; j<20; j++)
 	{
-		result << "iterator " << j << endl;
+		//result << "iterator " << j << endl;
 		cout << "iterator" << j << endl;
 		t3 = timeGetTime();
 		int b = 0;
@@ -444,13 +450,13 @@ void CRF::sgd_online_training()
 		}
 		double train_precision = evaluate(train);
 		double dev_precision = evaluate(dev);
-		double test_precision = evaluate(test);
+		//double test_precision = evaluate(test);
 		t4 = timeGetTime();
-		result << train.name << "=" << train_precision << endl;
-		result << dev.name << "=" << dev_precision << endl;
-		result << test.name << "=" << test_precision << endl;
+		//result << train.name << "=" << train_precision << endl;
+	//	result << dev.name << "=" << dev_precision << endl;
+		//result << test.name << "=" << test_precision << endl;
 		cout << "Use Time:" << (t4 - t3)*1.0 / 1000 << endl;
-		result << "Use Time:" << (t4 - t3)*1.0 / 1000 << endl;
+		//result << "Use Time:" << (t4 - t3)*1.0 / 1000 << endl;
 		if (train_precision > max_train_precision)
 		{
 			max_train_precision = train_precision;
@@ -459,21 +465,23 @@ void CRF::sgd_online_training()
 		{
 			max_dev_precision = dev_precision;
 		}	
+		/*
 		if (test_precision > max_test_precision)
 		{
 			max_dev_precision = test_precision;
 		}
+		*/
 	}
 	cout << train.name << "=" << max_train_precision << endl;
 	cout << dev.name << "=" << max_dev_precision << endl;
 	cout << test.name << "=" << max_test_precision << endl;
-	result << train.name + "最大值是:" << "=" << max_train_precision << endl;
-	result << dev.name + "最大值是:" << "=" << max_dev_precision << endl;
-	result << test.name + "最大值是:" << "=" << max_test_precision << endl;
+	//result << train.name + "最大值是:" << "=" << max_train_precision << endl;
+//	result << dev.name + "最大值是:" << "=" << max_dev_precision << endl;
+//	result << test.name + "最大值是:" << "=" << max_test_precision << endl;
 	t2 = timeGetTime();
 	cout << "Use Time:" << (t2 - t1)*1.0 / 1000 << endl;
-	result << "Use Time:" << (t2 - t1)*1.0 / 1000 << endl;
-	save_file();
+//	result << "Use Time:" << (t2 - t1)*1.0 / 1000 << endl;
+	//save_file();
 }
 
 void CRF::save_file()
