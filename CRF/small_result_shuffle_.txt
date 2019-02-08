@@ -1,0 +1,9 @@
+train.conll.txt共46572个句子，共1057943个词
+dev.conll.txt共2079个句子，共59955个词
+ the total number of features is 1400224
+using w to predict dev data...
+iterator 0
+train.conll.txt=0.937643
+dev.conll.txt=0.910199
+Use Time:719.525
+iterator 1

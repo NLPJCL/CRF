@@ -1,50 +1,53 @@
-#pragma once
+ï»¿#pragma once
 #include<iostream>
 #include<map>
 #include<vector>
-#include<cmath>//×ÔÈ»¶ÔÊıµÄÖ¸Êı¡£
+#include<cmath>//è‡ªç„¶å¯¹æ•°çš„æŒ‡æ•°ã€‚
 #include <algorithm>  
 #include<numeric>
 #include"dataset.h"
 #include "time.h"
 #include"windows.h"
+#include<unordered_map>
 using namespace std;
 class CRF
 {
 public:
-	CRF();
+	CRF(string train_, string dev_, string test_);
 	~CRF();
 public:
 	void create_feature_space();
-	void sgd_online_training();
-	//´æ´¢¡£
+	void sgd_online_training(bool shuffle, int iterator, int exitor);
+	//å­˜å‚¨ã€‚
 	void save_file();
 private:
-	//»ù´¡Êı¾İ¼¯¡£
+	//åŸºç¡€æ•°æ®é›†ã€‚
 	dataset train;
 	dataset dev;
 	dataset test;
-	map<string, int> model;//ÌØÕ÷¿Õ¼ä¡£
-	map<string, int> tag;//´ÊĞÔ
-	map<int, double> g;
-	vector<double> w;//Ò»Î¬µÄÌØÕ÷È¨ÖØ¡£
+	unordered_map<string, int> model;//ç‰¹å¾ç©ºé—´ã€‚
+	unordered_map<string, int> tag;//è¯æ€§
+	unordered_map<int, double> g;
+	//map<int, double> g;
+	//vector<double> g;
+	vector<double> w;//ä¸€ç»´çš„ç‰¹å¾æƒé‡ã€‚
 	vector<string> feature;
 	vector<string> vector_tag;
 	string create_one_feature(const sentence &sen, int pos);
 	vector<string> create_feature(const sentence &sentence, int pos);
-	//ÔÚÏßËã·¨
-	void update_w();
+	//åœ¨çº¿ç®—æ³•
+	void update_w(double eta);
 	void updata_g(const sentence &sen);
 	vector<string> max_score_sentence_tag(const sentence &sen);
 	vector<int> get_id(const vector<string> &f);
 	vector<double> count_score(const vector<string> &feature);
 
-	//Ç°ºóËã·¨
+	//å‰åç®—æ³•
 	vector<vector<double>> forword(const sentence&);
 	vector<vector<double>> backword(const sentence&);
 	vector<vector<double>> head_prob;
-	//ÆÀ¼Û¡£
+	//è¯„ä»·ã€‚
 	double evaluate(dataset);
 };
-vector<double> logsumexp(vector<vector<double>> &a);
+vector<double> logsumexp(const vector<vector<double>> &a);
 vector<vector<double>> translation(vector<vector<double>> &a);

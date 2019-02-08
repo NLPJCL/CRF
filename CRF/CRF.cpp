@@ -1,4 +1,4 @@
-#include "CRF.h"
+ï»¿#include "CRF.h"
 vector<double> logsumexp( vector<vector<double>> &a)
 {
 	vector<double> new_vector(a.size());
@@ -17,17 +17,19 @@ vector<double> logsumexp( vector<vector<double>> &a)
 	}
 	return new_vector;
 }
-double logsumexp(vector<double> &a)
+double logsumexp(const vector<double> &a)
 {
 
 		double new_double;
 		auto w = max_element(begin(a), end(a));
+		vector<double> new_vector(a.size());
 		double max = *w,all = 0.0;
+		vector<double> b(a.size());
 		for (int j = 0; j < a.size(); j++)
 		{
-			a[j] = exp(a[j] - max);
+			b[j] = exp(a[j] - max);
 		}
-		all = log(accumulate(a.begin(), a.end(), 0.0));
+		all = log(accumulate(b.begin(), b.end(), 0.0));
 		new_double = max + all;
 		return new_double;
 }
@@ -43,22 +45,34 @@ vector<vector<double>> translation(vector<vector<double>>& a)
 	}
 	return b;
 }
-CRF::CRF()
+CRF::CRF(string train_, string dev_, string test_)
 {
+	if (train_ != "")
+	{
+		train.read_data(train_);
+	}
+	if (dev_ != "")
+	{
+		dev.read_data(dev_);
+	}
+	if (test_ != "")
+	{
+		test.read_data(test_);
+	}
 }
 CRF::~CRF()
 {
 }
 vector<string> CRF::create_feature(const sentence &sentence, int pos)
 {
-	string word = sentence.word[pos];//µ±Ç°´Ê¡£
-	string word_char_first = sentence.word_char[pos][0];//µ±Ç°´ÊµÄµÚÒ»¸öÔªËØ¡£
-	string word_char_last = sentence.word_char[pos][sentence.word_char[pos].size() - 1];//µ±Ç°´ÊµÄ×îºóÒ»¸öÔªËØ¡£
+	string word = sentence.word[pos];//å½“å‰è¯ã€‚
+	string word_char_first = sentence.word_char[pos][0];//å½“å‰è¯çš„ç¬¬ä¸€ä¸ªå…ƒç´ ã€‚
+	string word_char_last = sentence.word_char[pos][sentence.word_char[pos].size() - 1];//å½“å‰è¯çš„æœ€åä¸€ä¸ªå…ƒç´ ã€‚
 	string word_m1;
 	string word_char_m1m1;
 	string word_p1;
 	string word_char_p1_first;
-	int word_count = sentence.word.size();//µ±Ç°¾äµÄ×Ü´ÊÊı¡£
+	int word_count = sentence.word.size();//å½“å‰å¥çš„æ€»è¯æ•°ã€‚
 	if (pos == 0)
 	{
 		word_m1 = "$$";
@@ -80,49 +94,41 @@ vector<string> CRF::create_feature(const sentence &sentence, int pos)
 		word_char_p1_first = sentence.word_char[pos + 1][0];
 	}
 	vector<string> f;
-	f.push_back("02:*" + word);
-	f.push_back("03:*" + word_m1);
-	f.push_back("04:*" + word_p1);
-	f.push_back("05:*" + word + "*" + word_char_m1m1);
-	f.push_back("06:*" + word + "*" + word_char_p1_first);
-	f.push_back("07:*" + word_char_first);
-	f.push_back("08:*" + word_char_last);
+	f.reserve(50);
+	f.emplace_back("02:*" + word);
+	f.emplace_back("03:*" + word_m1);
+	f.emplace_back("04:*" + word_p1);
+	f.emplace_back("05:*" + word + "*" + word_char_m1m1);
+	f.emplace_back("06:*" + word + "*" + word_char_p1_first);
+	f.emplace_back("07:*" + word_char_first);
+	f.emplace_back("08:*" + word_char_last);
 	int pos_word_len = sentence.word_char[pos].size();
 	for (int k = 1; k < pos_word_len - 1; k++)
 	{
-		f.push_back("09:*" + sentence.word_char[pos][k]);
-		f.push_back("10:*" + word_char_first + "*" + sentence.word_char[pos][k]);
-		f.push_back("11:*" + word_char_last + "*" + sentence.word_char[pos][k]);
-		if (sentence.word_char[pos][k] == sentence.word_char[pos][k + 1])
+		string cik = sentence.word_char[pos][k];
+		f.emplace_back("09:*" + cik);
+		f.emplace_back("10:*" + word_char_first + "*" + cik);
+		f.emplace_back("11:*" + word_char_last + "*" + cik);
+		string cikp1 = sentence.word_char[pos][k + 1];
+		if (cik == cikp1)
 		{
-			f.push_back("13:*" + sentence.word_char[pos][k] + "*" + "consecutive");
+			f.emplace_back("13:*" + cik + "*" + "consecutive");
 		}
-
 	}
-	if (sentence.word_char[pos].size()>1&&sentence.word_char[pos][0] ==sentence.word_char[pos][1])
+	if (sentence.word_char[pos].size() > 1)
 	{
-		f.push_back("13:*" +sentence.word_char[pos][0] + "*" + "consecutive");
+		if (sentence.word_char[pos][0] == sentence.word_char[pos][1])
+			f.emplace_back("13:*" + sentence.word_char[pos][0] + "*" + "consecutive");
 	}
 	if (pos_word_len == 1)
 	{
-		f.push_back("12:*" + word + "*" + word_char_m1m1 + "*" + word_char_p1_first);
+		f.emplace_back("12:*" + word + "*" + word_char_m1m1 + "*" + word_char_p1_first);
 	}
 	for (int k = 0; k <pos_word_len; k++)
 	{
 		if (k >= 4)break;
-		string prefix, suffix;
-		//»ñÈ¡Ç°×º
-		for (int n = 0; n <= k; n++)
-		{
-			prefix = prefix + sentence.word_char[pos][n];
-		}
-		//»ñÈ¡ºó×º¡£
-		for (int n = pos_word_len - k - 1; n <= pos_word_len - 1; n++)
-		{
-			suffix = suffix + sentence.word_char[pos][n];
-		}
-		f.push_back("14:*" + prefix);
-		f.push_back("15:*" + suffix);
+		f.emplace_back("14:*" + accumulate(sentence.word_char[pos].begin(), sentence.word_char[pos].begin() + k + 1, string("")));
+		f.emplace_back("15:*" + accumulate(sentence.word_char[pos].end() - (k + 1), sentence.word_char[pos].end(), string("")));
 	}
 	return f;
 }
@@ -139,9 +145,6 @@ string CRF::create_one_feature(const sentence &sen,int pos)
 }
 void CRF::create_feature_space()
 {
-	train.read_data("train");
-	dev.read_data("dev");
-	//test.read_data("test");
 	int word_count = 0, tag_count = 0;
 	vector<string> f;
 	for (auto sen = train.sentences.begin(); sen != train.sentences.end(); sen++)
@@ -149,21 +152,20 @@ void CRF::create_feature_space()
 		for (int i = 0; i < sen->word.size(); i++)
 		{
 			f = create_feature(*sen, i);
-			f.push_back(create_one_feature(*sen, i));
+			f.emplace_back(create_one_feature(*sen, i));
 			for (auto i = f.begin(); i != f.end(); i++)
 			{
 				if (model.find(*i) == model.end())
 				{
-					feature.push_back(*i);
-					model[*i] = word_count;
+					feature.emplace_back(*i);
+					model.insert({ *i , word_count });
 					word_count++;
 				}
 			}
-			f.clear();
 			if (tag.find(sen->tag[i]) == tag.end())
 			{
-				tag[sen->tag[i]] = tag_count;
-				vector_tag.push_back(sen->tag[i]);
+				tag.insert({ sen->tag[i], tag_count });
+				vector_tag.emplace_back(sen->tag[i]);
 				tag_count++;
 			}
 		}
@@ -171,25 +173,10 @@ void CRF::create_feature_space()
 	w.reserve(tag.size()*model.size());
 	for (int j = 0; j < tag.size()*model.size(); j++)
 	{
-		w.push_back(0);
+		w.emplace_back(0.0);
 	}
-		vector<vector<double>> c(tag.size(), vector<double>(tag.size(), 0));
-		for (int i = 0; i < tag.size(); i++)
-		{
-			for (int j = 0; j < tag.size(); j++)
-			{
-				if (model.find("01:*" + vector_tag[j]) != model.end())
-				{
-					int max_tag_id = model["01:*" + vector_tag[j]];
-					c[i][j] = w[i*model.size() + max_tag_id];
-				}
-				else
-				{
-					cout <<"³ö´í£¬²»ÊÇËùÓĞ´ÊĞÔ¶¼ÔÚmodelÀïÃæ¡£À©³äÁËmodel£¬modelÂÒÁË¡£"<< endl;
-				}
-			}
-		}
-		head_prob = c;
+	vector<vector<double>> c(tag.size(), vector<double>(tag.size(), 0));
+	head_prob = c;
 	cout << "the total number of features is " << model.size() << endl;
 	cout << "the total number of tags is " << tag.size() << endl;
 }
@@ -201,7 +188,7 @@ vector<int> CRF::get_id(const vector<string> &f)
 		auto t = model.find(*q);
 		if (t != model.end())
 		{
-			fv.push_back(t->second);
+			fv.emplace_back(t->second);
 		}
 	}
 	return fv;
@@ -209,7 +196,8 @@ vector<int> CRF::get_id(const vector<string> &f)
 vector<double> CRF::count_score(const vector<string> &feature)
 {
 	int offset = 0;
-	vector<vector<double>> scores(tag.size(), vector<double>(feature.size(), 0));
+	//vector<vector<double>> scores(tag.size(), vector<double>(feature.size(), 0));
+	vector<double> score(tag.size());
 	for (int j = 0; j < tag.size(); j++)
 	{
 		offset = j * model.size();
@@ -217,25 +205,28 @@ vector<double> CRF::count_score(const vector<string> &feature)
 		{
 			if (model.find(feature[i]) != model.end())
 			{
-				scores[j][i] += w[model[feature[i]] + offset];
+				//scores[j][i] = w[model[feature[i]] + offset];
+				score[j] += w[model[feature[i]] + offset];
 			}
 		}
 	}
+	/*
 	vector<double> score(tag.size());
 	for (int j = 0; j<tag.size(); j++)
 	{
 		score[j] = accumulate(scores[j].begin(), scores[j].end(), 0);
 	}
+	*/
 	return score;
 }
 vector<vector<double>> CRF::forword(const sentence &sen)
 {
 	vector<vector<double>> scores(sen.word.size(), vector<double>(tag.size(), 0));
-	//µÚÒ»¸ö´Ê
+	//ç¬¬ä¸€ä¸ªè¯
 	vector<string> first_feature = create_feature(sen, 0);
-	first_feature.push_back(create_one_feature(sen,0));
+	first_feature.emplace_back(create_one_feature(sen,0));
 	scores[0]=count_score(first_feature);
-	//ÆäÓàµÄ´Ê¡£
+	//å…¶ä½™çš„è¯ã€‚
 	for (int z = 1; z < sen.word.size(); z++)
 	{
 		vector<string> curr_feature = create_feature(sen, z);
@@ -261,10 +252,10 @@ vector<vector<double>> CRF::forword(const sentence &sen)
 }
 vector<vector<double>> CRF::backword(const sentence &sen)
 {
-	//·½±ã¼ÆËã¡£
+	//æ–¹ä¾¿è®¡ç®—ã€‚
 	vector<vector<double>> scores(sen.tag.size(), vector<double>(tag.size(), 0));
-	//ÆäÓàµÄ´Ê¡£	
-	vector<vector<double>> q = translation(this->head_prob);
+	//å…¶ä½™çš„è¯ã€‚	
+	vector<vector<double>> q = translation(head_prob);
 	for (int z = sen.word.size()-2; z >=0; z--)
 	{
 		vector<string> curr_feature = create_feature(sen, z+1);
@@ -281,27 +272,34 @@ vector<vector<double>> CRF::backword(const sentence &sen)
 	}
 	return scores;
 }
-void CRF::update_w()
+void CRF::update_w(double eta)
 {
-	for (auto z = g.begin(); z != g.end(); z++)
+	for (auto z = g.begin(); z != g.end(); ++z)
 	{
-		w[z->first] += z->second;
+		w[z->first] += eta*z->second;
 	}
+	//cout << g.size();
+	/*
+	for (int i = 0; i < g.size(); i++)
+	{
+		w[i] += g[i];
+	}
+	*/
 }
 void CRF::updata_g(const sentence & sen)
 {
 	vector<vector<double>> alpha = forword(sen);
 	vector<vector<double>> beta = backword(sen);
-	//¼ÆËã·ÖÄ¸¡£
-	long double z = logsumexp(alpha[sen.word.size() - 1]);
+	//è®¡ç®—åˆ†æ¯ã€‚
+	double z = logsumexp(alpha[sen.word.size() - 1]);
 //	double q = logsumexp(beta[0]);
 //	cout << z << endl;
 //	cout << q << endl;
-	//¶ÔÕıÈ·µÄĞòÁĞ½øĞĞ´¦Àí£¬
+	//å¯¹æ­£ç¡®çš„åºåˆ—è¿›è¡Œå¤„ç†ï¼Œ
 	for (int i = 0; i < sen.word.size(); i++)
 	{
 		vector<string> first_feature = create_feature(sen, i);
-		first_feature.push_back(create_one_feature(sen,i));
+		first_feature.emplace_back(create_one_feature(sen,i));
 		vector<int> fv_id = get_id(first_feature);
 		int offset = tag[sen.tag[i]] * model.size();
 		for (int q = 0; q < fv_id.size(); q++)
@@ -309,9 +307,9 @@ void CRF::updata_g(const sentence & sen)
 			g[fv_id[q] + offset]++;
 		}
 	}
-	//¶ÔµÚÒ»¸ö´Ê½øĞĞ´¦Àí¡£
+	//å¯¹ç¬¬ä¸€ä¸ªè¯è¿›è¡Œå¤„ç†ã€‚
 	vector<string> first_feature = create_feature(sen, 0);
-	first_feature.push_back(create_one_feature(sen,0));
+	first_feature.emplace_back(create_one_feature(sen,0));
 	vector<int> fv_id = get_id(first_feature);
 	vector<double> first_score = count_score(first_feature);
 	for (int i = 0; i < tag.size(); i++)
@@ -323,7 +321,7 @@ void CRF::updata_g(const sentence & sen)
 			g[offset+fv_id[j]] -= p;
 		}
 	}
-	//¶ÔËùÓĞÓĞ¿ÉÄÜµÄÏµÁĞ½øĞĞ´¦Àí¡£
+	//å¯¹æ‰€æœ‰æœ‰å¯èƒ½çš„ç³»åˆ—è¿›è¡Œå¤„ç†ã€‚
 	for (int i = 1; i < sen.word.size(); i++)
 	{
 		vector<string> curr_feature = create_feature(sen, i);
@@ -347,20 +345,20 @@ void CRF::updata_g(const sentence & sen)
 vector<string> CRF::max_score_sentence_tag(const sentence &sen)
 {
 	vector<vector<double>> score_prob(sen.tag.size(), vector<double>(tag.size(), 0));
-	vector<vector<int>> score_path(sen.tag.size(), vector<int>(tag.size(), 0));
+	vector<vector<double>> score_path(sen.tag.size(), vector<double>(tag.size(), 0));
 	for (int i = 0; i < tag.size(); i++)
 	{
 		score_path[0][i] = -1;
 	}
-	//µÚÒ»¸ö´Ê¡£
+	//ç¬¬ä¸€ä¸ªè¯ã€‚
 	vector <string> feature = create_feature(sen, 0);
-	feature.push_back("01:*&&");
+	feature.emplace_back("01:*&&");
 	score_prob[0] = count_score(feature);
-	//ÆäÓàµÄ´Ê¡£
+	//å…¶ä½™çš„è¯ã€‚
 	for (int j = 1; j < sen.word.size(); j++)
 	{
 
-		vector<double> currect_prob(tag.size(), 0);
+		vector<int> currect_prob(tag.size(), 0);
 		vector <string> feature = create_feature(sen, j);
 		vector<double> score = count_score(feature);
 		for (int i = 0; i < tag.size(); i++)
@@ -369,9 +367,9 @@ vector<string> CRF::max_score_sentence_tag(const sentence &sen)
 			{
 				currect_prob[z] = head_prob[i][z] + score_prob[j - 1][z];
 			}
-			auto w = max_element(begin(currect_prob), end(currect_prob));
-			score_prob[j][i] = *w + score[i]; 
-			score_path[j][i] = distance(begin(currect_prob), w);
+			auto w = max_element(currect_prob.begin(), currect_prob.end());
+			score_prob[j][i] = *w + score[i];
+			score_path[j][i] = distance(currect_prob.begin(), w);
 		}
 	}
 	vector<string> path_max;
@@ -380,10 +378,10 @@ vector<string> CRF::max_score_sentence_tag(const sentence &sen)
 	int max_point = distance(begin(a), w);
 	for (int j = sen.word.size() - 1; j > 0; j--)
 	{
-		path_max.push_back(vector_tag[max_point]);
+		path_max.emplace_back(vector_tag[max_point]);
 		max_point = score_path[j][max_point];
 	}
-	path_max.push_back(vector_tag[max_point]);
+	path_max.emplace_back(vector_tag[max_point]);
 	reverse(path_max.begin(), path_max.end());
 	return path_max;
 }
@@ -402,99 +400,151 @@ double CRF::evaluate(dataset data)
 			all++;
 		}
 	}
-	cout << data.name << ":" << correct << "/" << all << "=" << (correct / double(all)) << endl;
 	return (correct / double(all));
 }
-
-void CRF::sgd_online_training()
+void CRF::sgd_online_training(bool shuffle, int iterator, int exitor)
 {
-	double max_train_precision = 0, max_dev_precision = 0, max_test_precision = 0;
-	int global_step = 1;
-	/*
-	ofstream result("bigresult.txt");
+	string file_name;
+	if (test.name.size() != 0)
+	{
+		file_name = "big_result_";
+	}
+	else
+	{
+		file_name = "small_result_";
+	}
+	if (shuffle)
+	{
+		file_name += "shuffle_";
+	}
+	file_name += ".txt";
+
+	ofstream result(file_name);
 	if (!result)
 	{
-		cout << "don't open feature file" << endl;
+		cout << "don't open  file" << endl;
 	}
+	result << train.name << "å…±" << train.sentence_count << "ä¸ªå¥å­ï¼Œå…±" << train.word_count << "ä¸ªè¯" << endl;
+	result << dev.name << "å…±" << dev.sentence_count << "ä¸ªå¥å­ï¼Œå…±" << dev.word_count << "ä¸ªè¯" << endl;
+	if (test.name.size() != 0)
+	{
+		result << test.name << "å…±" << test.sentence_count << "ä¸ªå¥å­ï¼Œå…±" << test.word_count << "ä¸ªè¯" << endl;
+	}
+	result << " the total number of features is " << model.size() << endl;
+	int count = 0;
+	int global_step = 30;
+	int b = 0;
+	double eta = 0.1;
+	double max_train_precision = 0;
+	int max_train_iterator = 0;
 
-	result << train.name << "¹²" << train.sentence_count << "¸ö¾ä×Ó£¬¹²" << train.word_count << "¸ö´Ê" << endl;
-	result << dev.name << "¹²" << dev.sentence_count << "¸ö¾ä×Ó£¬¹²" << dev.word_count << "¸ö´Ê" << endl;
-	result << test.name << "¹²" << test.sentence_count << "¸ö¾ä×Ó£¬¹²" << test.word_count << "¸ö´Ê" << endl;
-	*/
+	double max_dev_precision = 0;
+	int max_dev_iterator = 0;
+
+	double max_test_precision = 0;
+	int max_test_iterator = 0;
+	cout << "using W to predict dev data..." << endl;
+	result << "using w to predict dev data..." << endl;
 	DWORD t1, t2, t3, t4;
 	t1 = timeGetTime();
-	for (int j = 0; j<20; j++)
+
+	for (int j = 0; j < 20; j++)
 	{
-		//result << "iterator " << j << endl;
 		cout << "iterator" << j << endl;
+		result << "iterator " << j << endl;
 		t3 = timeGetTime();
-		int b = 0;
-		for (auto sen = train.sentences.begin(); sen != train.sentences.end(); sen++)
+		if (shuffle)
+		{
+			cout << "æ­£åœ¨æ‰“ä¹±æ•°æ®" << endl;
+			train.shuffle();
+		}
+		for (auto sen = train.sentences.begin(); sen != train.sentences.end(); ++sen)
 		{
 			b++;
 			updata_g(*sen);
 			if (b == global_step)
 			{
-				update_w();
+				update_w(eta);
 				b = 0;
+				//fill(g.begin(), g.end(), 0.0);
 				g.clear();
 			}
 			for (int i = 0; i < tag.size(); i++)
 			{
 				for (int j = 0; j < tag.size(); j++)
 				{
-						int max_tag_id = model["01:*" + vector_tag[j]];
-						head_prob[i][j] = w[i*model.size() + max_tag_id];
+					int max_tag_id = model["01:*" + vector_tag[j]];
+					head_prob[i][j] = w[i*model.size() + max_tag_id];
 				}
 			}
 		}
 		double train_precision = evaluate(train);
+		cout << train.name << "=" << train_precision << endl;
+		result << train.name << "=" << train_precision << endl;
+
 		double dev_precision = evaluate(dev);
-		//double test_precision = evaluate(test);
-		t4 = timeGetTime();
-		//result << train.name << "=" << train_precision << endl;
-	//	result << dev.name << "=" << dev_precision << endl;
-		//result << test.name << "=" << test_precision << endl;
-		cout << "Use Time:" << (t4 - t3)*1.0 / 1000 << endl;
-		//result << "Use Time:" << (t4 - t3)*1.0 / 1000 << endl;
+		cout << dev.name << "=" << dev_precision << endl;
+		result << dev.name << "=" << dev_precision << endl;
+
 		if (train_precision > max_train_precision)
 		{
 			max_train_precision = train_precision;
+			max_train_iterator = j;
 		}
 		if (dev_precision > max_dev_precision)
 		{
 			max_dev_precision = dev_precision;
-		}	
-		/*
-		if (test_precision > max_test_precision)
-		{
-			max_dev_precision = test_precision;
+			max_dev_iterator = j;
+			count = 0;
 		}
-		*/
+		else
+		{
+			count++;
+		}
+		if (test.name.size() != 0)
+		{
+			double test_precision = evaluate(test);
+			cout << test.name << "=" << test_precision << endl;
+			result << test.name << "=" << test_precision << endl;
+			if (test_precision > max_test_precision)
+			{
+				max_test_precision = test_precision;
+				max_test_iterator = j;
+			}
+		}
+
+		t4 = timeGetTime();
+		cout << "Use Time:" << (t4 - t3)*1.0 / 1000 << endl;
+		result << "Use Time:" << (t4 - t3)*1.0 / 1000 << endl;
+		if (count >= exitor)
+		{
+			break;
+		}
 	}
-	cout << train.name << "=" << max_train_precision << endl;
-	cout << dev.name << "=" << max_dev_precision << endl;
-	cout << test.name << "=" << max_test_precision << endl;
-	//result << train.name + "×î´óÖµÊÇ:" << "=" << max_train_precision << endl;
-//	result << dev.name + "×î´óÖµÊÇ:" << "=" << max_dev_precision << endl;
-//	result << test.name + "×î´óÖµÊÇ:" << "=" << max_test_precision << endl;
+	cout << train.name + "æœ€å¤§å€¼æ˜¯ï¼š" << "=" << max_train_precision << "åœ¨" << max_train_iterator << "æ¬¡" << endl;
+	cout << dev.name + "æœ€å¤§å€¼æ˜¯ï¼š" << "=" << max_dev_precision << "åœ¨" << max_dev_iterator << "æ¬¡" << endl;
+	result << train.name + "æœ€å¤§å€¼æ˜¯ï¼š" << "=" << max_train_precision << "åœ¨" << max_train_iterator << "æ¬¡" << endl;
+	result << dev.name + "æœ€å¤§å€¼æ˜¯ï¼š" << "=" << max_dev_precision << "åœ¨" << max_dev_iterator << "æ¬¡" << endl;
+	if (test.name.size() != 0)
+	{
+		cout << test.name + "æœ€å¤§å€¼æ˜¯ï¼š" << "=" << max_test_precision << "åœ¨" << max_test_iterator << "æ¬¡" << endl;
+		result << test.name + "æœ€å¤§å€¼æ˜¯ï¼š" << "=" << max_test_precision << "åœ¨" << max_test_iterator << "æ¬¡" << endl;
+	}
 	t2 = timeGetTime();
 	cout << "Use Time:" << (t2 - t1)*1.0 / 1000 << endl;
-//	result << "Use Time:" << (t2 - t1)*1.0 / 1000 << endl;
-	//save_file();
+	result << "Use Time:" << (t2 - t1)*1.0 / 1000 << endl;
 }
-
 void CRF::save_file()
 {
-	ofstream feature_file("big_feature.txt");
-	feature_file << "´ÊĞÔµÄ×ÜÊıÎª£º " << vector_tag.size() <<" "<<endl;
-	feature_file << "´ÊĞÔ·Ö±ğÎª£º ";
+	ofstream feature_file("feature.txt");
+	feature_file << "è¯æ€§çš„æ€»æ•°ä¸ºï¼š " << vector_tag.size() <<" "<<endl;
+	feature_file << "è¯æ€§åˆ†åˆ«ä¸ºï¼š ";
 	for (int i = 0; i < vector_tag.size(); i++)
 	{
 		feature_file << vector_tag[i] << " ";
 	}
 	feature_file << endl;
-	feature_file << "ÌØÕ÷µÄ´óĞ¡Îª£º " << model.size() <<" "<<endl;
+	feature_file << "ç‰¹å¾çš„å¤§å°ä¸ºï¼š " << model.size() <<" "<<endl;
 	int model_size = model.size();
 	for (int j=0; j<feature.size(); j++)
 	{
